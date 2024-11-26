@@ -14,11 +14,13 @@ int velocidadMotor1 = 0;
 int velocidadMotor2 = 0;
 
 bool configurado = false;
+bool primerIteracion = true;
 
 float errorAcumulado = 0;
 float tiempoAnterior = 0;
-float Kp = 10;
-float Ki = 2;
+unsigned long tiempoActual = 0;
+float Kp = 20;
+float Ki = 20;
 
 void setup() {
   Serial.begin(9600);
@@ -33,15 +35,12 @@ void loop() {
 
   if (!configurado) {
     Serial.read();
-    distanciaRecibida = -1;
-    while (distanciaRecibida <= 0 || distanciaRecibida > MAX_DIST) {
-      Serial.println("Ingrese la distancia objetivo (valor referencia): ");
-      while (!Serial.available());
-      String input = Serial.readStringUntil('\n');
-      distanciaRecibida = input.toInt();
-      if (distanciaRecibida <= 0 || distanciaRecibida > MAX_DIST) {
-        Serial.println("Error: valor de distancia no válido.");
-      }
+    Serial.println("Ingrese la distancia objetivo (valor referencia): ");
+    while (!Serial.available());
+    String input = Serial.readStringUntil('\n');
+    distanciaRecibida = input.toInt();
+    if (distanciaRecibida <= 0 || distanciaRecibida > MAX_DIST) {
+      Serial.println("Error: valor de distancia no válido.");
     }
 
     configurado = true;
@@ -58,7 +57,14 @@ void loop() {
 
     float error = distanciaRecibida - distanciaActual;
 
-    unsigned long tiempoActual = millis();
+    if (primerIteracion) {
+      tiempoActual = millis();
+      tiempoAnterior = millis();
+      primerIteracion = false;
+    } else {
+      tiempoActual = millis();
+    }
+
     float deltaTiempo = (tiempoActual - tiempoAnterior) / 1000.0; // Convertir a segundos
     tiempoAnterior = tiempoActual;
 
@@ -93,14 +99,12 @@ void loop() {
     if (abs(error) <= tolerancia) {
       velocidadMotor1 = 0;
       velocidadMotor2 = 0;
-      errorAcumulado = 0;
-      tiempoAnterior = 0;
       configurado = false;
     } 
 
     analogWrite(motorPin1, velocidadMotor1);
     analogWrite(motorPin2, velocidadMotor2);
-
+    
     Serial.print(distanciaActual);
     Serial.print("\t");
 
@@ -111,6 +115,12 @@ void loop() {
 
     if(!configurado){
       Serial.println("Aproximacion finalizada.");
+      distanciaRecibida = 0;  
+      velocidadAjustada = 0;
+      errorAcumulado = 0;
+      tiempoAnterior = 0;
+      distanciaActual = 0;
+      primerIteracion = true;
       loop();
     }
     
